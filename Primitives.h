@@ -62,44 +62,13 @@ enum class Status {
 
 class Triangle {
 public:
-	Triangle(Point pA, Point pB, Point pC) : status(Status::INCOMPLETE) {
-
-		vA = pA;
-		float temp = (pB.x - pA.x) * (pC.y - pA.y) - (pC.x - pA.x) * (pB.y - pA.y);
-		bool isCounterClockwise = temp > 0;
-
-		vA = pA;
-		vB = isCounterClockwise ? pB : pC;
-		vC = isCounterClockwise ? pC : pB;
-
-		circumCenter = CalculateCircumCenter();
-		circumRadiusSquared = vA.SquaredDistanceTo(circumCenter);
-	}
-
-	Point CalculateCircumCenter() {
-
-		// Formulae: https://tinyurl.com/yvsw7s5f
-
-		Point SqrA(powf(vA.x, 2), powf(vA.y, 2));
-		Point SqrB(powf(vB.x, 2), powf(vB.y, 2));
-		Point SqrC(powf(vC.x, 2), powf(vC.y, 2));
-
-		float D = (vA.x * (vB.y - vC.y) + vB.x * (vC.y - vA.y) + vC.x * (vA.y - vB.y)) * 2.0f;
-		float x = ((SqrA.x + SqrA.y) * (vB.y - vC.y) + (SqrB.x + SqrB.y) * 
-			(vC.y - vA.y) + (SqrC.x + SqrC.y) * (vA.y - vB.y)) / D;
-		float y = ((SqrA.x + SqrA.y) * (vC.x - vB.x) + (SqrB.x + SqrB.y) * 
-			(vA.x - vC.x) + (SqrC.x + SqrC.y) * (vB.x - vA.x)) / D;
-
-		return Point(x, y);
-	}
-
-	Point GetCircumCenter() { return circumCenter; }
-	float GetCircumRadiusSquared() { return circumRadiusSquared; }
+	Triangle(unsigned a, unsigned b, unsigned c) : 
+		 edgeIndexA(a), edgeIndexB(b), edgeIndexC(c),
+		 circumCenter(), circumRadiusSquared(0.0f),
+		 status(Status::INCOMPLETE) {}
 
 	Status status;
-	Point vA, vB, vC;
-private:
+	unsigned edgeIndexA, edgeIndexB, edgeIndexC;
 	Point circumCenter;
 	float circumRadiusSquared;
-	// TODO: Store edges as well
 };
