@@ -3,14 +3,15 @@
 // TODO: Add more to the class if needed
 class Point {
 public:
-	Point() : x(0.0f), y(0.0f) {}
+	Point() : x(0.0f), y(0.0f), id(INT_MAX) {}
 
-	Point(float _x, float _y)
-		: x(_x), y(_y) {}
+	Point(float _x, float _y, int _id = INT_MAX, bool _isSupra = false)
+		: x(_x), y(_y), id(_id), isSupra(_isSupra) {}
 
 	Point(const Point& p) {
 		x = p.x;
 		y = p.y;
+		id = p.id;
 		isSupra = p.isSupra;
 	}
 
@@ -22,22 +23,41 @@ public:
 	Point& operator=(const Point& p) {
 		x = p.x;
 		y = p.y;
+		id = p.id;
 		isSupra = p.isSupra;
 		return (*this);
 	}
 
-	bool operator==(const Point& p) {
+	bool operator<(const Point& p) {
+		return (x == p.x) ? ((y < p.y) ? true : false) :
+			(x < p.x) ? true : false;
+	}
+
+	bool operator==(const Point& p) const {
 		return (fabs(x - p.x) < FLT_EPSILON)
 			&& (fabs(y - p.y) < FLT_EPSILON);
 	}
 
 	float x, y;
+	unsigned id;
 	bool isSupra = false;
+};
+
+template<>
+struct std::hash<Point>
+{
+	std::size_t operator()(const Point& p) const noexcept
+	{
+		std::size_t h1 = std::hash<float>{}(p.x);
+		std::size_t h2 = std::hash<float>{}(p.y);
+		return h1 ^ (h2 << 1); // or use boost::hash_combine
+	}
 };
 
 // TODO: Add more to the class if needed
 class Edge {
 public:
+	Edge() {}
 	Edge(Point _p1, Point _p2)
 		: p1(_p1), p2(_p2) {}
 

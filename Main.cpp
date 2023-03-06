@@ -1,7 +1,7 @@
 /*
 **********************************************************
 By Sreyash (Srey) Raychaudhuri
-Delaunay Triangulation Demo
+Dungeon Generation Demo
 **********************************************************
 * */
 
@@ -14,7 +14,7 @@ Delaunay Triangulation Demo
 #include <iostream>
 #include <vector>
 
-#include "DelaunayTriangulator.h"
+#include "DungeonGenerator.h"
 
 const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
@@ -57,18 +57,21 @@ int main() {
     }
 
 
-    std::unique_ptr<DelaunayTriangulator> p_Triangulator
-        = std::make_unique<DelaunayTriangulator>();
+    std::unique_ptr<DungeonGenerator> p_DungeonGenerator
+        = std::make_unique<DungeonGenerator>();
 
     int currState, prevState;
     bool triangulateNextStep = false;
 
     glColor3f(1, 1, 1);
 
-    p_Triangulator->Init(10000);
-
     bool ranOnce = false;
 
+    p_DungeonGenerator->Init(10);
+    p_DungeonGenerator->Separate();
+    p_DungeonGenerator->Triangulate();
+    p_DungeonGenerator->CreateMST();
+    p_DungeonGenerator->AddBackExtraEdges();
 
     // Update loop
     // -----------
@@ -78,16 +81,16 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0, 0, 0, 1.0f);
 
-        if (!p_Triangulator->StepWiseModeOn() && !ranOnce) {
-            p_Triangulator->Triangulate(); ranOnce = true;
-        }
+        // STEPWISE TRIANGULATION
+        //if (!p_DungeonGenerator->StepWiseModeOn() && !ranOnce) {
+        //    p_DungeonGenerator->Triangulate(); ranOnce = true;
+        //}
 
-        if (triangulateNextStep) {
-            p_Triangulator->Triangulate();
-            triangulateNextStep = false;
-        }
-
-        p_Triangulator->Display();
+        //if (triangulateNextStep) {
+        //    p_DungeonGenerator->Triangulate();
+        //    triangulateNextStep = false;
+        //}
+        p_DungeonGenerator->Display();
 
         glfwSwapBuffers(window);
         glfwPollEvents();

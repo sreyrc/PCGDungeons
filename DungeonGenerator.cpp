@@ -1,4 +1,4 @@
-#include "DelaunayTriangulator.h"
+#include "DungeonGenerator.h"
 
 #include <algorithm>
 #include <glad/glad.h>
@@ -8,37 +8,93 @@
 #include <numeric>
 #include <ranges>
 
-
 bool CompareX(Point& p1, Point& p2) {
 	return p1.x < p2.x;
 }
 
 // Generates a random set of points on the screen
-void DelaunayTriangulator::Init(unsigned size)
+void DungeonGenerator::Init(unsigned size)
 {
-	std::vector<int> vX(size);
-	std::vector<int> vY(size);
-
-	std::random_device rd;
-	std::iota(vX.begin(), vX.end(), 1);
-	std::shuffle(vX.begin(), vX.end(), rd);
-
-	std::iota(vY.begin(), vY.end(), 1);
-	std::shuffle(vY.begin(), vY.end(), rd);
-
-	for (unsigned index = 0; index < size; index++) {
-
-
-		float newX = (((vX[index] - 1) * (2.0f)) / (float)(size - 1)) + -1.0f;
-		float newY = (((vY[index] - 1) * (2.0f)) / (float)(size - 1)) + -1.0f;
-
-		m_Points.emplace_back(newX, newY);
-	}
+	std::srand(std::time(nullptr));
 
 	m_DontUseEdge.resize(m_EdgeBoolVecSize);
+
+	for (int index = 0; index < size; index++) {
+		float roomWidthX = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+		float roomWidthY = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+		roomWidthX = std::clamp(roomWidthX, 0.4f, 0.8f);
+		roomWidthY = std::clamp(roomWidthY, 0.4f, 0.8f);
+
+		m_Rooms.emplace_back(roomWidthX * 100, roomWidthY * 100, index);
+	}
 }
 
-Triangle DelaunayTriangulator::GenerateSuperTriangle()
+void DungeonGenerator::Separate()
+{
+	unsigned roomsNeedingSeparation = m_Rooms.size();
+
+	// Give each a tiny nudge randomly along the x or y dir
+	for (auto& room : m_Rooms) {
+		float xOffset = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+		float yOffset = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+		float xDir = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+		float yDir = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
+
+		if (xDir < 0.5f) xOffset = -xOffset;
+		if (yDir < 0.5f) yOffset = -yOffset;
+
+		room.m_Position += glm::vec2(xOffset * 0.0001, yOffset * 0.0001);
+	}
+
+	// Run until all rooms are separated
+	while (roomsNeedingSeparation) {
+
+		for (auto& room : m_Rooms) {
+			int neighborCount = 0;
+			glm::vec2 v(0);
+
+			// For each room
+			for (auto& otherRoom : m_Rooms)
+			{
+				// If same room - skip
+				if (&room == &otherRoom) continue;
+
+				float roomPosDiff = glm::length(room.m_Position - otherRoom.m_Position);
+
+				// If rooms are too close
+				if (roomPosDiff < ((room.m_Width + otherRoom.m_Width) * 1.7f) ||
+					roomPosDiff < ((room.m_Height + otherRoom.m_Height) * 1.7f))
+				{
+					neighborCount++;
+					v += otherRoom.m_Position - room.m_Position;
+				}
+			}
+
+			// If no separating vel - far away enough from every other room
+			if (v == glm::vec2(0))
+			{
+				if (roomsNeedingSeparation > 0) roomsNeedingSeparation--;
+				room.m_Velocity = glm::vec2(0);
+				//continue;
+			}
+			else
+			{
+				v *= -1;
+				v /= neighborCount;
+				v = glm::normalize(v);
+
+				room.m_Velocity = v * 10.0f;
+				room.m_Position += (room.m_Velocity * 0.01f);
+			}
+		}
+	}
+
+	for (auto& room : m_Rooms) room.UpdateCorners();
+}
+
+Triangle DungeonGenerator::GenerateSuperTriangle()
 {
 	float minX = FLT_MAX;
 	float minY = FLT_MAX;
@@ -58,9 +114,8 @@ Triangle DelaunayTriangulator::GenerateSuperTriangle()
 	float yCen = (minY + maxY) * 0.5f;
 
 	// The float 0.866 is an arbitrary value determined for optimum supra triangle conditions.
-	// TODO: Change back to 0.866f
-	float x1 = xCen - 0.5f * dMax;
-	float x2 = xCen + 0.5f * dMax;
+	float x1 = xCen - 0.866f * dMax;
+	float x2 = xCen + 0.866f * dMax;
 	float x3 = xCen;
 
 	float y1 = yCen - 0.5f * dMax;
@@ -70,10 +125,6 @@ Triangle DelaunayTriangulator::GenerateSuperTriangle()
 	Point pA(x1, y1); pA.isSupra = true;
 	Point pB(x2, y2); pB.isSupra = true;
 	Point pC(x3, y3); pC.isSupra = true;
-
-	m_Points.push_back(pC);
-	m_Points.push_back(pA);
-	m_Points.push_back(pB);
 
 	// Arrange in anti-clockwise order
 	float temp = (pB.x - pA.x) * (pC.y - pA.y) - (pC.x - pA.x) * (pB.y - pA.y);
@@ -98,14 +149,25 @@ Triangle DelaunayTriangulator::GenerateSuperTriangle()
 }
 
 // Bowyer-Watson's algorithm https://www.tinyurl.com/488kubkh
-void DelaunayTriangulator::Triangulate()
+void DungeonGenerator::Triangulate()
 {
 	// Define a super/supra-triangle that surrounds all the points. 
 	// Add them to the end of the list and mark them as isSupra (=true) 
 	if (m_currentStepPointIndex == 0) {
+		for (unsigned index = 0; index < m_Rooms.size(); index++) {
+			m_Points.emplace_back(
+				m_Rooms[index].m_Position.x,
+				m_Rooms[index].m_Position.y,
+				index);
+		}
 		// Sort the points in ascending order of x-coordinate
 		std::sort(m_Points.begin(), m_Points.end(), CompareX);
 		m_Triangles.push_back(GenerateSuperTriangle()); 
+
+		size_t pointCount = m_Points.size();
+		for (int index = 0; index < pointCount; index++) {
+			m_Points[index].id = index;
+		}
 	}
 	
 	// Loop through points
@@ -238,7 +300,7 @@ void DelaunayTriangulator::Triangulate()
 		}
 	}
 
-	if (m_StepWiseModeOn && m_currentStepPointIndex < m_Points.size() - 3) {
+	if (m_StepWiseModeOn && m_currentStepPointIndex < m_Points.size()) {
 		return;
 	}
 
@@ -265,36 +327,54 @@ void DelaunayTriangulator::Triangulate()
 	}
 }
 
-void DelaunayTriangulator::Display() {
+
+void DrawRoom(unsigned i, RoomSet& rooms) {
+	auto room = rooms[i];
+	glVertex2f(room.m_Corners[0].x, room.m_Corners[0].y);
+	glVertex2f(room.m_Corners[1].x, room.m_Corners[1].y);
+
+	glVertex2f(room.m_Corners[1].x, room.m_Corners[1].y);
+	glVertex2f(room.m_Corners[2].x, room.m_Corners[2].y);
+
+	glVertex2f(room.m_Corners[2].x, room.m_Corners[2].y);
+	glVertex2f(room.m_Corners[3].x, room.m_Corners[3].y);
+
+	glVertex2f(room.m_Corners[3].x, room.m_Corners[3].y);
+	glVertex2f(room.m_Corners[0].x, room.m_Corners[0].y);
+}
+
+void DungeonGenerator::Display() {
 	glLineWidth(1.0f);
 	glPointSize(10.0f);
 	glColor3f(1.0f, 1.0f, 1.0f);
 
 	DisplayPoints();
 	glBegin(GL_LINES);
-	size_t edgeVecSize = m_Edges.size();
-	for (unsigned i = 0; i < edgeVecSize; i++) {
-		auto& edge = m_Edges[i];
-		if (!m_DontUseEdge[i]) {
-			glVertex2f(edge.p1.x, edge.p1.y);
-			glVertex2f(edge.p2.x, edge.p2.y);
-		}
+	size_t edgeCount = m_FinalEdgesIndices.size();
+	for (unsigned index = 0; index < edgeCount; index++) {
+		auto& edge = m_Edges[m_FinalEdgesIndices[index]];
+
+		DrawRoom(edge.p1.id, m_Rooms);
+		DrawRoom(edge.p2.id, m_Rooms);
+
+		glVertex2f(edge.p1.x, edge.p1.y);
+		glVertex2f(edge.p2.x, edge.p2.y);
 	}
 	glEnd();
 }
 
-void DelaunayTriangulator::DisplayPoints() {
+void DungeonGenerator::DisplayPoints() {
 
-	//glColor3f(1, 1, 1);
+	glColor3f(1, 1, 1);
 
-	//glBegin(GL_POINTS);
-	//for (auto& p : m_Points) {
-	//	glVertex2f(p.x, p.y);
-	//}
-	//glEnd();
+	glBegin(GL_POINTS);
+	for (auto& p : m_Points) {
+		glVertex2f(p.x, p.y);
+	}
+	glEnd();
 }
 
-void DelaunayTriangulator::CalculateCircumCenter(Triangle& tri, Point vA, Point vB, Point vC)
+void DungeonGenerator::CalculateCircumCenter(Triangle& tri, Point vA, Point vB, Point vC)
 {
 	// Formulae: https://tinyurl.com/yvsw7s5f
 
@@ -313,4 +393,74 @@ void DelaunayTriangulator::CalculateCircumCenter(Triangle& tri, Point vA, Point 
 	// Square of Eucl. dist. between the CC and any of the vertices
 	tri.circumRadiusSquared = ((vA.x - x) * (vA.x - x)) +
 		((vA.y - y) * (vA.y - y));
+}
+
+
+Point FindParent(Point point, 
+	std::unordered_map<Point, Point>& parent) {
+	if (parent[point] == point) {
+		return point;
+	}
+	else {
+		return FindParent(parent[parent[point]], parent);
+	}
+
+}
+
+void DungeonGenerator::CreateMST()
+{
+	size_t edgeCount = m_Edges.size();
+	for (unsigned index = 0; index < edgeCount; index++) {
+		if (!m_DontUseEdge[index]) {
+			m_ExtraEdgesIndices.push_back(index);
+		}
+	}
+
+	auto pointCount = m_Points.size();
+
+	std::vector<unsigned> mstEdges;
+
+	// no. of edges = no. of nodes/vertices - 1
+	mstEdges.resize(pointCount - 1);
+
+	// Array to store parent of each point
+	std::unordered_map<Point, Point> parents;
+	
+	// Initialize parents to self
+	for (int index = 0; index < pointCount; index++) {
+		parents[m_Points[index]] = m_Points[index];
+	}
+
+	unsigned count = 0, index = 0;
+	while (count != pointCount - 1) {
+
+		if (!m_DontUseEdge[index]) {
+			Edge edge = m_Edges[index];
+
+			// TODO: Find source parent and destination parent
+			Point sourceParent = FindParent(edge.p1, parents);
+			Point destParent = FindParent(edge.p2, parents);
+
+			if (!(sourceParent == destParent)) {
+				mstEdges[count++] = index;
+				parents[sourceParent] = destParent;
+			}
+		}
+		index++;
+	}
+
+	m_FinalEdgesIndices.insert(m_FinalEdgesIndices.end(),
+		mstEdges.begin(), mstEdges.end());
+}
+
+void DungeonGenerator::AddBackExtraEdges()
+{
+	std::srand(std::time(nullptr));
+	unsigned extraEdgeCount = m_ExtraEdgesIndices.size();
+	for (int index = 0; index < extraEdgeCount; index++) {
+		float randomNum = (std::rand() / static_cast<float>(RAND_MAX));
+		if (randomNum < 0.3f) { 
+			m_FinalEdgesIndices.push_back(m_ExtraEdgesIndices[index]);
+		}
+	}
 }
