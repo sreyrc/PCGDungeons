@@ -65,7 +65,9 @@ int main() {
 
     glColor3f(1, 1, 1);
 
-    p_Triangulator->Init(10);
+    p_Triangulator->Init(10000);
+
+    bool ranOnce = false;
 
 
     // Update loop
@@ -75,6 +77,10 @@ int main() {
         processInput(window, currState, prevState, triangulateNextStep);
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0, 0, 0, 1.0f);
+
+        if (!p_Triangulator->StepWiseModeOn() && !ranOnce) {
+            p_Triangulator->Triangulate(); ranOnce = true;
+        }
 
         if (triangulateNextStep) {
             p_Triangulator->Triangulate();
