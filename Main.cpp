@@ -65,7 +65,7 @@ int main() {
 
     glColor3f(1, 1, 1);
 
-    p_Triangulator->Init(10);
+    p_Triangulator->Init(10000);
 
     bool ranOnce = false;
 

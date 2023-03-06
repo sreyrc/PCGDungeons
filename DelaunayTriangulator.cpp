@@ -185,7 +185,7 @@ void DelaunayTriangulator::Triangulate()
 
 		// Create new edges and triangles from those edges
 		size_t badEdgeVecSize = badEdges.size();
-		EdgeVec newEdges; unsigned k = 0;
+		EdgeVec newEdges;
 		
 		// Loop though all indices of bad edges
 		for (unsigned i = 0; i < badEdgeVecSize; i++) {
@@ -193,14 +193,22 @@ void DelaunayTriangulator::Triangulate()
 			if (!m_DontUseEdge[badEdges[i]]) {
 
 				Edge edge1(p, m_Edges[badEdges[i]].p1);
-				auto edgeIter = std::find(m_Edges.begin(), m_Edges.end(), edge1);
-				if (edgeIter == m_Edges.end()) { m_Edges.push_back(edge1); first = m_Edges.size() - 1; }
-				else { first = std::distance(m_Edges.begin(), edgeIter); }
+				auto edgeIter = std::find(newEdges.begin(), newEdges.end(), edge1);
+				if (edgeIter == newEdges.end()) {
+					newEdges.push_back(edge1); 
+					first = m_Edges.size() + newEdges.size() - 1; 
+				}
+				else { 
+					first = m_Edges.size() + std::distance(newEdges.begin(), edgeIter); }
 				
 				Edge edge2(p, m_Edges[badEdges[i]].p2);
-				edgeIter = std::find(m_Edges.begin(), m_Edges.end(), edge2);
-				if (edgeIter == m_Edges.end()) { m_Edges.push_back(edge2); second = m_Edges.size() - 1; }
-				else { second = std::distance(m_Edges.begin(), edgeIter); }
+				edgeIter = std::find(newEdges.begin(), newEdges.end(), edge2);
+				if (edgeIter == newEdges.end()) {
+					newEdges.push_back(edge2); 
+					second = m_Edges.size() + newEdges.size() - 1; 
+				}
+				else { 
+					second = m_Edges.size() + std::distance(newEdges.begin(), edgeIter); }
 
 				m_Triangles.emplace_back(first, badEdges[i], second);
 
@@ -218,6 +226,8 @@ void DelaunayTriangulator::Triangulate()
 			}
 		}
 
+		m_Edges.insert(m_Edges.end(), newEdges.begin(), newEdges.end());
+
 		if (m_Edges.size() > m_DontUseEdge.size()) {
 			m_EdgeBoolVecSize *= 2;
 			m_DontUseEdge.resize(m_EdgeBoolVecSize);
@@ -232,7 +242,7 @@ void DelaunayTriangulator::Triangulate()
 		return;
 	}
 
-	//	Form the final triangulatlon by removing all triangles
+	//	Form the final triangulation by removing all triangles
 	//	which have one or more of the supertriangle
 	//	vertices.
 	
@@ -256,7 +266,7 @@ void DelaunayTriangulator::Triangulate()
 }
 
 void DelaunayTriangulator::Display() {
-	glLineWidth(1.5f);
+	glLineWidth(1.0f);
 	glPointSize(10.0f);
 	glColor3f(1.0f, 1.0f, 1.0f);
 
@@ -275,13 +285,13 @@ void DelaunayTriangulator::Display() {
 
 void DelaunayTriangulator::DisplayPoints() {
 
-	glColor3f(1, 1, 1);
+	//glColor3f(1, 1, 1);
 
-	glBegin(GL_POINTS);
-	for (auto& p : m_Points) {
-		glVertex2f(p.x, p.y);
-	}
-	glEnd();
+	//glBegin(GL_POINTS);
+	//for (auto& p : m_Points) {
+	//	glVertex2f(p.x, p.y);
+	//}
+	//glEnd();
 }
 
 void DelaunayTriangulator::CalculateCircumCenter(Triangle& tri, Point vA, Point vB, Point vC)
