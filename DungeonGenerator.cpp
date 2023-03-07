@@ -1,11 +1,12 @@
+// ---------------------------------------------------------------------------
+// Written by Sreyash Raychaudhuri
+// File Purpose: Implementation of DungeonGenerator class
+// ---------------------------------------------------------------------------
 
 #include <glad/glad.h>
 
 #include <algorithm>
-#include <random>
-#include <algorithm>
-#include <numeric>
-#include <ranges>
+#include <ctime>
 
 #include "DungeonGenerator.h"
 
@@ -37,6 +38,7 @@ void DungeonGenerator::Generate(unsigned numRooms)
 	// part of the triangulation but not part of the MST
 	AddBackExtraEdges();
 }
+
 
 void DungeonGenerator::Init(unsigned size)
 {
@@ -73,46 +75,52 @@ void DungeonGenerator::Separate()
 		if (xDir < 0.5f) xOffset = -xOffset;
 		if (yDir < 0.5f) yOffset = -yOffset;
 
-		room.m_Position += glm::vec2(xOffset * 0.0001, yOffset * 0.0001);
+		room.m_Position += Point(xOffset * 0.0001, yOffset * 0.0001);
 	}
 
 	// Run until all rooms are separated
 	while (roomsNeedingSeparation) {
 
+		// For every room
 		for (auto& room : m_Rooms) {
 			int neighborCount = 0;
-			glm::vec2 v(0);
+			Point v;
 
-			// For each room
+			// Check against other rooms
 			for (auto& otherRoom : m_Rooms)
 			{
 				// If same room - skip
 				if (&room == &otherRoom) continue;
 
-				float roomPosDiff = glm::length(room.m_Position - otherRoom.m_Position);
+				float roomPosDiff = room.m_Position.DistanceTo(otherRoom.m_Position);
 
 				// If rooms are too close
 				if (roomPosDiff < ((room.m_Width + otherRoom.m_Width) * 1.7f) ||
 					roomPosDiff < ((room.m_Height + otherRoom.m_Height) * 1.7f))
 				{
 					neighborCount++;
-					v += otherRoom.m_Position - room.m_Position;
+
+					// Increase separating velocity
+					v += (otherRoom.m_Position - room.m_Position);
 				}
 			}
 
 			// If no separating vel - far away enough from every other room
-			if (v == glm::vec2(0))
+			if (v == Point(0, 0))
 			{
 				if (roomsNeedingSeparation > 0) roomsNeedingSeparation--;
-				room.m_Velocity = glm::vec2(0);
+				room.m_Velocity = Point(0, 0);
 			}
 			else
 			{
-				v *= -1;
-				v /= neighborCount;
-				v = glm::normalize(v);
+				// Adjust velocity
+				v = v * -1;
+				v = v / static_cast<float>(neighborCount);
+				v.Normalize();
 
 				room.m_Velocity = v * 10.0f;
+
+				// Increment position depending on velocity
 				room.m_Position += (room.m_Velocity * 0.01f);
 			}
 		}
@@ -194,7 +202,7 @@ void DungeonGenerator::Triangulate()
 	// id of point = it's index in the m_Points vec
 	size_t pointCount = m_Points.size();
 	for (int index = 0; index < pointCount; index++) {
-		m_Points[index].id = index;
+		m_Points[index].m_ID = index;
 	}
 	
 	// Loop through all points
@@ -218,7 +226,6 @@ void DungeonGenerator::Triangulate()
 
 				float dx = (triangle.circumCenter.x - p.x);
 				float dx2 = dx * dx;
-
 
 				if (dx2 >= R2) {
 					//	If Dx2 >= R2, then the circumclrcle for this triangle
@@ -259,9 +266,9 @@ void DungeonGenerator::Triangulate()
 		for (unsigned i = 0; i < badEdges.size(); i++) {
 			for (unsigned j = i + 1; j < badEdges.size(); j++) {
 				if (i == j) continue;
+				// If duplicate edge found
 				if (badEdges[i] == badEdges[j]) {
-					// We don't actually delete since it is potentially expensive
-					// Just mark the edge as INVALID
+					// Mark the edge as INVALID
 					m_EdgeStatus[badEdges[i]] = EdgeStatus::INVALID;
 				}
 			}
@@ -280,6 +287,8 @@ void DungeonGenerator::Triangulate()
 
 			if (m_EdgeStatus[badEdges[i]] == EdgeStatus::AVAILABLE) {
 
+				size_t edgeCount = m_Edges.size();
+				
 				// Create and edge from current point to one of the 
 				// vertices of the bad edge
 				Edge edge1(p, m_Edges[badEdges[i]].p1);
@@ -290,22 +299,26 @@ void DungeonGenerator::Triangulate()
 				// If not, add it and set first index of new triangle accordingly
 				if (edgeIter == newEdges.end()) {
 					newEdges.push_back(edge1); 
-					newTriEdge1 = m_Edges.size() + newEdges.size() - 1; 
+					// Index of this edge = Size of m_Edges + the last index of newEdges
+					// m_Edges will accommodate this edge when the new edges are appended to it
+					newTriEdge1 = edgeCount + newEdges.size() - 1;
 				}
 				else { // else just set the index of first
-					newTriEdge1 = m_Edges.size() + std::distance(newEdges.begin(), edgeIter); }
+					// Index = Size of m_Edges + index of newEdges where this edge was found
+					newTriEdge1 = edgeCount + std::distance(newEdges.begin(), edgeIter); }
 				
 				// Do the same for the edge connecting current point and other point of the edge
 				Edge edge2(p, m_Edges[badEdges[i]].p2);
 				edgeIter = std::find(newEdges.begin(), newEdges.end(), edge2);
 				if (edgeIter == newEdges.end()) {
 					newEdges.push_back(edge2); 
-					newTriEdge2 = m_Edges.size() + newEdges.size() - 1; 
+					newTriEdge2 = edgeCount + newEdges.size() - 1;
 				}
 				else { 
-					newTriEdge2 = m_Edges.size() + std::distance(newEdges.begin(), edgeIter); }
+					newTriEdge2 = edgeCount + std::distance(newEdges.begin(), edgeIter);
+				}
 
-				// Add this new triangle
+				// Add this new triangle and calculate its data
 				m_Triangles.emplace_back(newTriEdge1, badEdges[i], newTriEdge2);
 
 				CalculateTriangleData(m_Triangles.back(), 
@@ -315,8 +328,10 @@ void DungeonGenerator::Triangulate()
 			}
 		}
 
+		// Insert the set of new edges to the main edges vector
 		m_Edges.insert(m_Edges.end(), newEdges.begin(), newEdges.end());
 
+		// If EdgeStatus container too small, increase size
 		if (m_Edges.size() > m_EdgeStatus.size()) {
 			m_EdgeStatusVecSize *= 2;
 			m_EdgeStatus.resize(m_EdgeStatusVecSize);
@@ -351,13 +366,17 @@ void DungeonGenerator::Triangulate()
 
 
 void DungeonGenerator::Display() {
-	glLineWidth(1.0f);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(0, 0, 0, 1.0f);
+	glLineWidth(1.5f);
 	glPointSize(10.0f);
-	glColor3f(1.0f, 1.0f, 1.0f);
+	glColor3f(1.0f, 1.0f, 0.0f);
 
 	glBegin(GL_LINES);
 	size_t edgeCount = m_Edges.size();
 
+	// Display the dungeon edges
 	for (unsigned index = 0; index < edgeCount; index++) {
 		if (m_EdgeStatus[index] == EdgeStatus::IN_MST ||
 			m_EdgeStatus[index] == EdgeStatus::EXTRA) {
@@ -367,6 +386,8 @@ void DungeonGenerator::Display() {
 		}
 	}
 
+	// Display the rooms
+	glColor3f(1.0f, 1.0f, 1.0f);
 	for (const auto& room : m_Rooms) {
 		for (unsigned index = 0; index < 4; index++) {
 			glVertex2f(room.m_Corners[index].x, room.m_Corners[index].y);
@@ -375,13 +396,15 @@ void DungeonGenerator::Display() {
 	}
 	glEnd();
 
-	// TODO: No need to display center of rooms eventually
+	// Display the room venter positions 
+	// (initially used for debugging the graph algorithms)
 	glBegin(GL_POINTS);
 	for (const auto& room : m_Rooms) {
 		glVertex2f(room.m_Position.x, room.m_Position.y);
 	}
 	glEnd();
 }
+
 
 void DungeonGenerator::CalculateTriangleData(Triangle& tri, Point vA, Point vB, Point vC)
 {
@@ -405,15 +428,19 @@ void DungeonGenerator::CalculateTriangleData(Triangle& tri, Point vA, Point vB, 
 }
 
 
-unsigned FindParent(unsigned pointIndex, 
+/// @brief Find parent of given point at m_Points[pointIndex]
+/// @param pointIndex Index of point in m_Points whose parent we wish to find
+/// @param parent point parent vector
+/// @return index of parent point
+unsigned FindParent(unsigned pointIndex,
 	std::vector<unsigned>& parent) {
-	if (parent[pointIndex] == pointIndex) {
-		return pointIndex;
-	}
-	else {
-		return FindParent(parent[pointIndex], parent);
-	}
 
+	if (parent[pointIndex] == pointIndex) { 
+		return pointIndex; 
+	}
+	else { 
+		return FindParent(parent[pointIndex], parent); 
+	}
 }
 
 void DungeonGenerator::CreateMST()
@@ -427,7 +454,7 @@ void DungeonGenerator::CreateMST()
 	mstEdges.resize(pointCount - 1);
 
 	// Array to store parent point index of each point
-	// All indices of these points are to the m_Points
+	// All indices of these points are to the m_Points vector
 	std::vector<unsigned> parents(pointCount);
 	
 	// Initialize parents of points to self
@@ -445,8 +472,8 @@ void DungeonGenerator::CreateMST()
 			Edge edge = m_Edges[inputIndex];
 
 			// Find source parent and destination parent
-			unsigned sourceParent = FindParent(edge.p1.id, parents);
-			unsigned destParent = FindParent(edge.p2.id, parents);
+			unsigned sourceParent = FindParent(edge.p1.m_ID, parents);
+			unsigned destParent = FindParent(edge.p2.m_ID, parents);
 
 			// If parents aren't the same - there's no cycle. Add this edge
 			// to the MST and set parent source to dest.
@@ -462,12 +489,15 @@ void DungeonGenerator::CreateMST()
 	}
 }
 
+
 void DungeonGenerator::AddBackExtraEdges()
 {
 	std::srand(std::time(nullptr));
 	unsigned extraEdgeCount = m_Edges.size();
 	for (int index = 0; index < extraEdgeCount; index++) {
+		// Only if edge is availble for use
 		if (m_EdgeStatus[index] == EdgeStatus::AVAILABLE) {
+			// 30% chance that this edge may be marked as extra for use
 			float randomNum = (std::rand() / static_cast<float>(RAND_MAX));
 			if (randomNum < 0.3f) {
 				m_EdgeStatus[index] = EdgeStatus::EXTRA;

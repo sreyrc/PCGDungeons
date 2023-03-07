@@ -1,7 +1,7 @@
 /*
 **********************************************************
 By Sreyash (Srey) Raychaudhuri
-Dungeon Generation Demo
+Procedural Dungeon Generation Demo
 **********************************************************
 * */
 
@@ -15,9 +15,6 @@ Dungeon Generation Demo
 #include <vector>
 
 #include "DungeonGenerator.h"
-
-const int SCREEN_WIDTH = 1920;
-const int SCREEN_HEIGHT = 1080;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
@@ -61,15 +58,10 @@ int main() {
 
     p_DungeonGenerator->Generate(10);
 
-    glColor3f(1, 1, 1);
-
     // Update loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClearColor(0, 0, 0, 1.0f);
-
         p_DungeonGenerator->Display();
 
         glfwSwapBuffers(window);
