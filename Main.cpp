@@ -20,7 +20,6 @@ const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window, int& currState, int& prevState, bool& triangulateNextStep);
 
 int main() {
 
@@ -60,36 +59,17 @@ int main() {
     std::unique_ptr<DungeonGenerator> p_DungeonGenerator
         = std::make_unique<DungeonGenerator>();
 
-    int currState, prevState;
-    bool triangulateNextStep = false;
+    p_DungeonGenerator->Generate(10);
 
     glColor3f(1, 1, 1);
-
-    bool ranOnce = false;
-
-    p_DungeonGenerator->Init(10);
-    p_DungeonGenerator->Separate();
-    p_DungeonGenerator->Triangulate();
-    p_DungeonGenerator->CreateMST();
-    p_DungeonGenerator->AddBackExtraEdges();
 
     // Update loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
-        processInput(window, currState, prevState, triangulateNextStep);
         glClear(GL_COLOR_BUFFER_BIT);
         glClearColor(0, 0, 0, 1.0f);
 
-        // STEPWISE TRIANGULATION
-        //if (!p_DungeonGenerator->StepWiseModeOn() && !ranOnce) {
-        //    p_DungeonGenerator->Triangulate(); ranOnce = true;
-        //}
-
-        //if (triangulateNextStep) {
-        //    p_DungeonGenerator->Triangulate();
-        //    triangulateNextStep = false;
-        //}
         p_DungeonGenerator->Display();
 
         glfwSwapBuffers(window);
@@ -104,12 +84,4 @@ int main() {
 // To make sure the viewport matches the new window dimensions; 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
-}
-
-void processInput(GLFWwindow* window, int& currState, int& prevState, bool& triangulateNextStep) {
-    currState = glfwGetKey(window, GLFW_KEY_P);
-    if (currState == GLFW_PRESS && prevState == GLFW_RELEASE) {
-        triangulateNextStep = true;
-    }
-    prevState = currState;
 }

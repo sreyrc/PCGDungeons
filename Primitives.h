@@ -6,13 +6,13 @@ public:
 	Point() : x(0.0f), y(0.0f), id(INT_MAX) {}
 
 	Point(float _x, float _y, int _id = INT_MAX, bool _isSupra = false)
-		: x(_x), y(_y), id(_id), isSupra(_isSupra) {}
+		: x(_x), y(_y), id(_id), isSuper(_isSupra) {}
 
 	Point(const Point& p) {
 		x = p.x;
 		y = p.y;
 		id = p.id;
-		isSupra = p.isSupra;
+		isSuper = p.isSuper;
 	}
 
 	float SquaredDistanceTo(const Point& p) const {
@@ -24,7 +24,7 @@ public:
 		x = p.x;
 		y = p.y;
 		id = p.id;
-		isSupra = p.isSupra;
+		isSuper = p.isSuper;
 		return (*this);
 	}
 
@@ -40,21 +40,16 @@ public:
 
 	float x, y;
 	unsigned id;
-	bool isSupra = false;
+	bool isSuper = false;
 };
 
-template<>
-struct std::hash<Point>
-{
-	std::size_t operator()(const Point& p) const noexcept
-	{
-		std::size_t h1 = std::hash<float>{}(p.x);
-		std::size_t h2 = std::hash<float>{}(p.y);
-		return h1 ^ (h2 << 1); // or use boost::hash_combine
-	}
+enum class EdgeStatus {
+	AVAILABLE,
+	INVALID,
+	IN_MST,
+	EXTRA
 };
 
-// TODO: Add more to the class if needed
 class Edge {
 public:
 	Edge() {}
@@ -74,7 +69,7 @@ public:
 	Point p1, p2;
 };
 
-enum class Status {
+enum class TriangleStatus {
 	INCOMPLETE,
 	COMPLETE
 };
@@ -85,9 +80,9 @@ public:
 	Triangle(unsigned a, unsigned b, unsigned c) : 
 		 edgeIndexA(a), edgeIndexB(b), edgeIndexC(c),
 		 circumCenter(), circumRadiusSquared(0.0f),
-		 status(Status::INCOMPLETE) {}
+		 status(TriangleStatus::INCOMPLETE) {}
 
-	Status status;
+	TriangleStatus status;
 	unsigned edgeIndexA, edgeIndexB, edgeIndexC;
 	Point circumCenter;
 	float circumRadiusSquared;
