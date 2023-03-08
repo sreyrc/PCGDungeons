@@ -1,7 +1,7 @@
 /*
 **********************************************************
 By Sreyash (Srey) Raychaudhuri
-Delaunay Triangulation Demo
+Procedural Dungeon Generation Demo
 **********************************************************
 * */
 
@@ -14,13 +14,9 @@ Delaunay Triangulation Demo
 #include <iostream>
 #include <vector>
 
-#include "DelaunayTriangulator.h"
-
-const int SCREEN_WIDTH = 1920;
-const int SCREEN_HEIGHT = 1080;
+#include "DungeonGenerator.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window, int& currState, int& prevState, bool& triangulateNextStep);
 
 int main() {
 
@@ -57,37 +53,16 @@ int main() {
     }
 
 
-    std::unique_ptr<DelaunayTriangulator> p_Triangulator
-        = std::make_unique<DelaunayTriangulator>();
+    std::unique_ptr<DungeonGenerator> p_DungeonGenerator
+        = std::make_unique<DungeonGenerator>();
 
-    int currState, prevState;
-    bool triangulateNextStep = false;
-
-    glColor3f(1, 1, 1);
-
-    p_Triangulator->Init(10000);
-
-    bool ranOnce = false;
-
+    p_DungeonGenerator->Generate(10);
 
     // Update loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
-        processInput(window, currState, prevState, triangulateNextStep);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClearColor(0, 0, 0, 1.0f);
-
-        if (!p_Triangulator->StepWiseModeOn() && !ranOnce) {
-            p_Triangulator->Triangulate(); ranOnce = true;
-        }
-
-        if (triangulateNextStep) {
-            p_Triangulator->Triangulate();
-            triangulateNextStep = false;
-        }
-
-        p_Triangulator->Display();
+        p_DungeonGenerator->Display();
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -101,12 +76,4 @@ int main() {
 // To make sure the viewport matches the new window dimensions; 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
-}
-
-void processInput(GLFWwindow* window, int& currState, int& prevState, bool& triangulateNextStep) {
-    currState = glfwGetKey(window, GLFW_KEY_P);
-    if (currState == GLFW_PRESS && prevState == GLFW_RELEASE) {
-        triangulateNextStep = true;
-    }
-    prevState = currState;
 }
